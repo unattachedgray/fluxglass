@@ -47,6 +47,12 @@ chosen order is saved under the standard XDG configuration directory. Short
 windows scroll vertically, while live metric typography scales down only when
 needed to preserve a complete single-line reading.
 
+Fluxglass remembers language, graph order, view options, window size, and
+maximized state. Wayland compositors intentionally control application
+placement, so portable GTK4 applications cannot reliably restore an exact
+screen position; Fluxglass leaves placement to the desktop rather than adding
+an X11-only positioning path.
+
 The Resource Compass above the history grid summarizes the present moment. Its
 inner ring combines total compute intensity with the CPU/GPU ratio; its split
 outer ring shows RAM and VRAM pressure. Exact percentages and a plain-language

@@ -2,7 +2,7 @@ import sys, unittest
 sys.path.insert(0,"src")
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from fluxglass.app import advance_state_event,columns_for_width,detect_events,human_mb,load_order,resource_metrics,save_order
+from fluxglass.app import advance_state_event,columns_for_width,detect_events,human_mb,load_order,load_window_state,resource_metrics,save_order
 
 class FormatTests(unittest.TestCase):
     def test_human_mb(self):
@@ -39,5 +39,11 @@ class FormatTests(unittest.TestCase):
             self.assertIsNone(event)
         stable,pending,count,event=advance_state_event("CPU-LED",stable,pending,count)
         self.assertEqual(("event_state",{"old":"IDLE","new":"CPU-LED"}),event)
+
+    def test_window_state_is_validated(self):
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"settings.json"
+            path.write_text('{"window":{"width":120,"height":99999,"maximized":true}}')
+            self.assertEqual({"width":560,"height":4096,"maximized":True},load_window_state(path))
 
 if __name__ == "__main__": unittest.main()

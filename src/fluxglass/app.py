@@ -79,6 +79,14 @@ def load_language(path=None):
     value=load_settings(path).get("language","ko")
     return value if value in ("ko","en") else "ko"
 
+def load_window_state(path=None):
+    value=load_settings(path).get("window",{})
+    if not isinstance(value,dict):value={}
+    def dimension(name,default,minimum):
+        raw=value.get(name,default)
+        return max(minimum,min(4096,raw)) if isinstance(raw,int) and not isinstance(raw,bool) else default
+    return {"width":dimension("width",980,560),"height":dimension("height",720,420),"maximized":bool(value.get("maximized",False))}
+
 def detect_events(previous,current):
     if previous is None:return [("event_started",{})]
     events=[]; old,new=resource_metrics(previous),resource_metrics(current)
@@ -277,9 +285,12 @@ class ResourceWindow(Gtk.ApplicationWindow):
         self.sampler=Sampler(); self.snapshot=None; self.history=deque(maxlen=180); self.history_cursor=None; self.focused_graph=None
         self.events=deque(maxlen=24); self.options=load_options(); self.recording=None; self.recording_writer=None; self.recording_path=None
         self.event_state=None; self.pending_event_state=None; self.pending_event_count=0
+        self.window_state=load_window_state(); self.size_save_source=None
         set_language(load_language())
         self.set_decorated(False); self.set_resizable(True)
-        self.set_default_size(980,720); self.build(); self.add_tick_callback(self.layout_tick)
+        self.set_default_size(self.window_state["width"],self.window_state["height"]); self.build(); self.add_tick_callback(self.layout_tick)
+        self.connect("notify::maximized",self.maximized_changed); self.connect("close-request",self.closing)
+        if self.window_state["maximized"]:GLib.idle_add(self.maximize)
         GLib.timeout_add(1000,self.tick); self.tick()
     def build(self):
         outer=Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -340,6 +351,14 @@ class ResourceWindow(Gtk.ApplicationWindow):
     def toggle_maximize(self):
         if self.is_maximized():self.unmaximize()
         else:self.maximize()
+    def maximized_changed(self,*_):
+        self.window_state["maximized"]=self.is_maximized(); write_settings({"window":self.window_state})
+    def persist_window_size(self):
+        self.size_save_source=None; write_settings({"window":self.window_state}); return False
+    def closing(self,*_):
+        if not self.is_maximized():
+            self.window_state.update({"width":self.get_width(),"height":self.get_height()})
+        write_settings({"window":self.window_state}); return False
     def set_option(self,key,value):
         self.options[key]=value; write_settings({"view_options":self.options})
         self.compass.show_pressure=self.options["pressure"]; self.compass.show_states=self.options["state_history"]; self.compass.queue_draw(); self.set_option_visibility()
@@ -391,6 +410,11 @@ class ResourceWindow(Gtk.ApplicationWindow):
         return True
     def layout_tick(self,*_):
         width=self.get_width(); columns=columns_for_width(width)
+        if not self.is_maximized() and width>0 and self.get_height()>0:
+            size=(width,self.get_height())
+            if size!=(self.window_state["width"],self.window_state["height"]):
+                self.window_state.update({"width":size[0],"height":size[1]})
+                if self.size_save_source is None:self.size_save_source=GLib.timeout_add(600,self.persist_window_size)
         self.reflow(columns); return True
     def reflow(self,columns,force=False):
         if columns==self.columns and not force:return
