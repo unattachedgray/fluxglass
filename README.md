@@ -31,8 +31,10 @@ administrator-managed, unpackaged software.
 After installation, launch **Fluxglass** from the application menu. Remove it
 cleanly with `sudo apt remove fluxglass`.
 
-The interface starts in Korean and can switch live between Korean and English
-from **보기 → 언어**. The selection persists. Fluxglass bundles the OFL
+The interface starts in Korean and can switch live between Korean and English.
+The header menu always names the current language in English (`Korean` or
+`English`) so it remains discoverable before translation. The selection
+persists. Fluxglass bundles the OFL
 licensed Pretendard Variable and Bebas Neue fonts, installs them into the
 per-user font directory, and keeps Noto Sans KR as its fallback.
 

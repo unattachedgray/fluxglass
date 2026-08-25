@@ -2,7 +2,8 @@
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 command -v xvfb-run >/dev/null || { echo "SKIP: xvfb-run is unavailable"; exit 0; }
-xvfb-run -a -s '-screen 0 1200x900x24' env -u WAYLAND_DISPLAY GDK_BACKEND=x11 PYTHONPATH="$repo_dir/src" python3 - <<'PY'
+test_config_dir="$(mktemp -d)"
+xvfb-run -a -s '-screen 0 1200x900x24' env -u WAYLAND_DISPLAY GDK_BACKEND=x11 XDG_CONFIG_HOME="$test_config_dir" PYTHONPATH="$repo_dir/src" python3 - <<'PY'
 import gi
 gi.require_version("Gtk","4.0")
 from gi.repository import GLib, Gtk
@@ -20,6 +21,10 @@ assert isinstance(window.window_handle,Gtk.WindowHandle)
 assert isinstance(window.resize_grip,ResizeGrip) and not window.get_decorated()
 assert isinstance(window.get_child().get_child(),Gtk.ScrolledWindow)
 assert window.brand_icon.get_icon_name()=="fluxglass"
+assert window.language_button.get_label()=="Korean"
+selector=Gtk.DropDown.new_from_strings(["Korean","English"]); selector.set_selected(1)
+window.change_language(selector,None); settle()
+assert window.language_button.get_label()=="English"
 assert window.get_sensitive() and window.get_can_target()
 window.close(); settle(); assert not app.get_windows()
 print("PASS: adaptive window has native move, resize, and lifecycle controls")

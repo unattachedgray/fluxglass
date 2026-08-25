@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
-version="${FLUXGLASS_VERSION:-0.5.0}"
+version="${FLUXGLASS_VERSION:-0.5.1}"
 stage_dir="$(mktemp -d)"
 trap 'rm -rf "$stage_dir"' EXIT
 root="$stage_dir/root"
