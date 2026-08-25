@@ -1,0 +1,12 @@
+Package: fluxglass
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0
+Recommends: lm-sensors, pciutils
+Maintainer: Fluxglass Contributors <unattachedgray@users.noreply.github.com>
+Homepage: https://github.com/unattachedgray/fluxglass
+Description: Beautiful read-only Linux hardware graphs
+ Fluxglass displays CPU, memory, GPU and process telemetry in one
+ adaptive, frameless GTK4 system instrument.

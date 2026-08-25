@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+data_dir="${XDG_DATA_HOME:-${HOME}/.local/share}"
+bin_dir="${HOME}/.local/bin"
+lib_dir="${HOME}/.local/lib/fluxglass"
+mkdir -p "$bin_dir" "$lib_dir/fluxglass" "$data_dir/applications" \
+  "$data_dir/icons/hicolor/512x512/apps" "$data_dir/fonts/fluxglass"
+install -m 0644 "$repo_dir"/src/fluxglass/*.py "$lib_dir/fluxglass/"
+install -m 0644 "$repo_dir/assets/fluxglass.png" \
+  "$data_dir/icons/hicolor/512x512/apps/fluxglass.png"
+install -m 0644 "$repo_dir"/assets/fonts/*.ttf "$data_dir/fonts/fluxglass/"
+sed "s|Exec=fluxglass|Exec=$bin_dir/fluxglass|g" \
+  "$repo_dir/packaging/io.github.unattachedgray.Fluxglass.desktop" \
+  > "$data_dir/applications/io.github.unattachedgray.Fluxglass.desktop"
+chmod 0644 "$data_dir/applications/io.github.unattachedgray.Fluxglass.desktop"
+cat > "$bin_dir/fluxglass" <<EOF
+#!/usr/bin/env bash
+exec env PYTHONPATH="$lib_dir" python3 -m fluxglass "\$@"
+EOF
+chmod 0755 "$bin_dir/fluxglass"
+command -v update-desktop-database >/dev/null && update-desktop-database "$data_dir/applications"
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f -t "$data_dir/icons/hicolor" >/dev/null
+command -v fc-cache >/dev/null && fc-cache -f "$data_dir/fonts/fluxglass" >/dev/null
+echo "Installed Fluxglass for this user."

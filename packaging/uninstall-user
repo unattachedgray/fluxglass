@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+data_dir="${XDG_DATA_HOME:-${HOME}/.local/share}"
+rm -f "${HOME}/.local/bin/fluxglass"
+rm -f "$data_dir/applications/io.github.unattachedgray.Fluxglass.desktop"
+rm -f "$data_dir/icons/hicolor/512x512/apps/fluxglass.png"
+rm -rf "${HOME}/.local/lib/fluxglass"
+rm -rf "$data_dir/fonts/fluxglass"
+command -v update-desktop-database >/dev/null && update-desktop-database "$data_dir/applications"
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f -t "$data_dir/icons/hicolor" >/dev/null
+command -v fc-cache >/dev/null && fc-cache -f >/dev/null
+echo "Removed the per-user Fluxglass installation."

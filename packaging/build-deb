@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+version="${FLUXGLASS_VERSION:-0.5.0}"
+stage_dir="$(mktemp -d)"
+trap 'rm -rf "$stage_dir"' EXIT
+root="$stage_dir/root"
+mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/lib/fluxglass/fluxglass" \
+  "$root/usr/share/applications" "$root/usr/share/doc/fluxglass/fonts" \
+  "$root/usr/share/fonts/truetype/fluxglass"
+mkdir -p "$root/usr/share/icons/hicolor/512x512/apps"
+install -m 0644 "$repo_dir"/src/fluxglass/*.py "$root/usr/lib/fluxglass/fluxglass/"
+install -m 0644 "$repo_dir/packaging/io.github.unattachedgray.Fluxglass.desktop" "$root/usr/share/applications/"
+install -m 0644 "$repo_dir/README.md" "$root/usr/share/doc/fluxglass/README.md"
+install -m 0644 "$repo_dir/LICENSE" "$root/usr/share/doc/fluxglass/LICENSE"
+install -m 0644 "$repo_dir/assets/fluxglass.png" "$root/usr/share/icons/hicolor/512x512/apps/fluxglass.png"
+install -m 0644 "$repo_dir"/assets/fonts/*.ttf "$root/usr/share/fonts/truetype/fluxglass/"
+install -m 0644 "$repo_dir"/assets/fonts/*-OFL.txt "$root/usr/share/doc/fluxglass/fonts/"
+sed "s/@VERSION@/$version/" "$repo_dir/packaging/control" > "$root/DEBIAN/control"
+cat > "$root/usr/bin/fluxglass" <<'EOF'
+#!/usr/bin/env bash
+exec env PYTHONPATH=/usr/lib/fluxglass python3 -m fluxglass "$@"
+EOF
+chmod 0755 "$root/usr/bin/fluxglass"
+mkdir -p "$repo_dir/dist"
+dpkg-deb --root-owner-group --build "$root" "$repo_dir/dist/fluxglass_${version}_all.deb"

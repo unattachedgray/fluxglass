@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Fluxglass
+Name[ko]=플럭스글라스
+Comment=Beautiful live CPU, memory, GPU and process graphs
+Comment[ko]=CPU, 메모리, GPU와 프로세스를 보여 주는 아름다운 실시간 그래프
+Exec=fluxglass
+Icon=fluxglass
+Terminal=false
+Categories=System;Monitor;
+Keywords=system;monitor;CPU;GPU;VRAM;memory;temperature;

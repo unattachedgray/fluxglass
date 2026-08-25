@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb xauth libegl1
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests
+      - name: Run GTK lifecycle test
+        run: ./tests/test_runtime_lifecycle.sh
+      - name: Build Debian package
+        run: ./packaging/build-deb

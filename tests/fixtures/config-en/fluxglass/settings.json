@@ -1,0 +1,8 @@
+{
+  "language": "en",
+  "view_options": {
+    "pressure": true,
+    "state_history": true,
+    "events": true
+  }
+}
