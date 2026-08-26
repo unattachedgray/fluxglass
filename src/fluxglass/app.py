@@ -112,7 +112,7 @@ def human_mb(value):
 
 def resource_metrics(snapshot):
     gpu=snapshot.get("gpu") or {}; memory=snapshot.get("memory") or {}; cpu=snapshot.get("cpu") or {}
-    pressure=snapshot.get("pressure") or {}
+    pressure=snapshot.get("pressure") or {}; shared=bool(gpu.get("shared_memory"))
     def psi(name):return ((pressure.get(name) or {}).get("some") or {}).get("avg10",0) or 0
     values={
         "cpu":max(0,min(100,cpu.get("pct") or 0)),
@@ -120,11 +120,13 @@ def resource_metrics(snapshot):
         "ram":100*(memory.get("used_mb") or 0)/max(1,memory.get("total_mb") or 1),
         "vram":100*(gpu.get("used_mb") or 0)/max(1,gpu.get("total_mb") or 1),
         "cpu_pressure":psi("cpu"),"memory_pressure":psi("memory"),"io_pressure":psi("io"),
+        "gpu_available":gpu.get("util_pct") is not None,"shared_memory":shared,
+        "gpu_approx":gpu.get("util_source")=="frequency",
     }
     total=values["cpu"]+values["gpu"]
     values["pressure"]=max(values["cpu_pressure"],values["memory_pressure"],values["io_pressure"])
     if values["pressure"]>=1:state="CONTENTION"
-    elif values["vram"]>=90:state="VRAM PRESSURE"
+    elif values["vram"]>=90 and not shared:state="VRAM PRESSURE"
     elif values["ram"]>=85:state="MEMORY PRESSURE"
     elif total<8:state="IDLE"
     elif values["gpu"]/total>.65:state="GPU-LED"
@@ -170,15 +172,18 @@ class ResourceCompass(Gtk.DrawingArea):
         value=f"{m['activity']:.0f}%"; self.text(cr,cx-canvas_text_width(cr,value,24,True)/2,cy+3,value,24,bold=True)
         state=state_text(m["state"]); self.text(cr,cx-canvas_text_width(cr,state,9,True)/2,cy+24,state,9,(.64,.69,.78),True)
         self.text(cr,14,20,t("compass"),11,(.68,.72,.8),True)
-        items=((t("cpu"),m["cpu"],PALETTE[2]),(t("gpu"),m["gpu"],PALETTE[0]),(t("ram"),m["ram"],PALETTE[3]),(t("vram"),m["vram"],PALETTE[1]))
+        # An unmeasurable GPU reads as a dash, never as a confident zero.
+        gpu_text=t("gpu_approx",value=m["gpu"]) if m.get("gpu_approx") else f"{m['gpu']:.0f}%"
+        if not m.get("gpu_available",True):gpu_text="\u2014"
+        items=((t("cpu"),f"{m['cpu']:.0f}%",PALETTE[2]),(t("gpu"),gpu_text,PALETTE[0]),(t("ram"),f"{m['ram']:.0f}%",PALETTE[3]),(t("vram"),f"{m['vram']:.0f}%",PALETTE[1]))
         if compact:
             base_y=181
             for i,(name,value,color) in enumerate(items):
-                x=14+i*(width-28)/4; self.text(cr,x,base_y,name,9,color,True); self.text(cr,x,base_y+16,f"{value:.0f}%",12)
+                x=14+i*(width-28)/4; self.text(cr,x,base_y,name,9,color,True); self.text(cr,x,base_y+16,value,12)
         else:
             x=max(240,width*.48); row=42
             for i,(name,value,color) in enumerate(items):
-                y=45+i*34; self.text(cr,x,y,name,10,color,True); self.text(cr,x+68,y,f"{value:.0f}%",16,bold=True)
+                y=45+i*34; self.text(cr,x,y,name,10,color,True); self.text(cr,x+68,y,value,16,bold=True)
                 cr.set_source_rgba(*color,.22); cr.set_line_width(3); cr.move_to(x,y+8); cr.line_to(min(width-18,x+150),y+8); cr.stroke()
         if self.show_states and self.history:
             colors={"IDLE":(.30,.33,.39),"CPU-LED":PALETTE[2],"GPU-LED":PALETTE[0],"BALANCED":PALETTE[1],"CONTENTION":PALETTE[4],"MEMORY PRESSURE":PALETTE[3],"VRAM PRESSURE":PALETTE[1]}
@@ -424,10 +429,17 @@ class ResourceWindow(Gtk.ApplicationWindow):
         visible=[self.focused_graph] if self.focused_graph else self.graphs
         for i,graph in enumerate(visible):self.grid.attach(graph,i%columns,i//columns,columns if self.focused_graph else 1,1)
     def gpu_detail(self):
-        g=(self.snapshot or {}).get("gpu") or {}; util=g.get("util_pct") or 0; temp=g.get("temperature_c"); margin=g.get("thermal_margin_c")
-        return f"{util:.0f}%" + (t("temperature",value=temp) if temp is not None else "") + (t("headroom",value=margin) if margin is not None else "")
+        g=(self.snapshot or {}).get("gpu") or {}
+        if not g:return t("gpu_absent")
+        util=g.get("util_pct"); temp=g.get("temperature_c"); margin=g.get("thermal_margin_c")
+        if util is None:base=t("gpu_unavailable")
+        elif g.get("util_source")=="frequency":base=t("gpu_approx",value=util)
+        else:base=f"{util:.0f}%"
+        return base + (t("temperature",value=temp) if temp is not None else "") + (t("headroom",value=margin) if margin is not None else "")
     def vram_detail(self):
-        g=(self.snapshot or {}).get("gpu") or {}; return f"{human_mb(g.get('used_mb',0))} / {human_mb(g.get('total_mb',0))}"
+        g=(self.snapshot or {}).get("gpu") or {}
+        if not g:return t("gpu_absent")
+        return f"{human_mb(g.get('used_mb',0))} / {human_mb(g.get('total_mb',0))}" + (t("shared_memory") if g.get("shared_memory") else "")
     def cpu_detail(self):
         c=(self.snapshot or {"cpu":{}})["cpu"]; limit=c.get("temperature_limit_c"); headroom=(limit-c["temperature_c"]) if limit and c.get("temperature_c") is not None else None
         return t("active_cores",pct=c.get("pct",0),active=c.get("active",0),online=c.get("online",0))+(t("temperature",value=c["temperature_c"]) if c.get("temperature_c") is not None else "")+(t("headroom",value=headroom) if headroom is not None else "")

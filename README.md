@@ -3,8 +3,47 @@
 Read-only Linux hardware graphs for Ubuntu-family desktops. Fluxglass is
 one adaptive, frameless system instrument inspired by classic Linux desktop
 monitors. Its GTK4 surface works under Wayland and X11 and uses standard kernel
-sensors, AMD/Intel DRM counters, and richer optional NVIDIA counters when
+sensors, AMD DRM counters, and richer optional NVIDIA counters when
 `nvidia-smi` is present.
+
+Integrated graphics expose no dedicated video memory, because they draw from
+system RAM. On those machines the video memory card reports the shared system
+pool and labels it as shared rather than showing an empty gauge. A machine with
+no GPU at all reads `No GPU detected`. Absent instruments are never drawn as
+idle ones.
+
+GPU compute is read from the best source the kernel allows, and the reading says
+which one it used:
+
+| Source | Shown as | Requires |
+| --- | --- | --- |
+| AMD `gpu_busy_percent` | `42%` | nothing |
+| i915 PMU engine-busy | `42%` | `CAP_PERFMON`, or `perf_event_paranoid` <= 0 |
+| GPU frequency P-state | `≈ 42%` | nothing |
+| none of the above | `Not measurable` | — |
+
+The frequency proxy scales the actual clock between `gt_RPn_freq_mhz` and
+`gt_RP0_freq_mhz`. It needs no permission and tracks load monotonically, but it
+saturates: once the GPU pegs at its top P-state a half load and a full load read
+alike. That is why it is always prefixed with `≈`.
+
+The i915 PMU is exact and separates partial load from full load, so Fluxglass
+prefers it whenever `perf_event_open` is permitted. Granting it to this one
+program is better than relaxing the setting for every process on the machine:
+
+```bash
+sudo setcap cap_perfmon+ep /usr/bin/fluxglass   # scoped, but see the note below
+sudo sysctl kernel.perf_event_paranoid=0        # system-wide, blunter
+```
+
+File capabilities are not inherited by an interpreter, so the `setcap` line has
+no effect on the stock Python launcher; it is listed for packagers who ship a
+compiled helper. Reading a PMU counter is read-only - Fluxglass still never
+writes to the GPU.
+
+`docs/gpu-telemetry.md` records the measurements behind this table, the interfaces
+that were tested and rejected (RC6 residency, DRM fdinfo engine counters), and how
+to reproduce all of it.
 
 ```bash
 ./packaging/build-deb

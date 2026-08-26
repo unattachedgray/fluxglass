@@ -13,6 +13,7 @@ EN={
 "record":"Record","stop_recording":"Stop recording","view":"View","pressure_halo":"Pressure halo","state_option":"State history","events_option":"Event memory","language":"Language","maximize":"Maximize","quit":"Quit",
 "move_window":"Drag this header to move Fluxglass","resize":"Drag to resize","quit_tip":"Quit Fluxglass","gpu_activity":"GPU ACTIVITY","recent_events":"RECENT EVENTS","no_gpu_process":"No per-process GPU activity reported",
 "host_status":"{host}  ·  {power}{cores} CORES ONLINE","gpu_power":"GPU {watts:.0f} W  ·  ","process_row":"{name}  ·  PID {pid}","process_stats":"{memory}   {sm:.0f}% SM",
+"gpu_approx":"\u2248 {value:.0f}%","shared_memory":"  ·  shared with system RAM","gpu_unavailable":"Not measurable","gpu_absent":"No GPU detected",
 "event_started":"Monitoring started","event_state":"State: {old} → {new}","event_gpu_available":"GPU sensor available","event_gpu_lost":"GPU sensor lost","event_throttle":"GPU clock constraint active",
 "recording_path":"Recording saved to {path}","tooltip_metrics":"CPU {cpu:.0f}% | GPU {gpu:.0f}% | RAM {ram:.0f}% | VRAM {vram:.0f}% | pressure {pressure:.2f}%",
 }
@@ -27,6 +28,7 @@ KO={
 "record":"기록","stop_recording":"기록 중지","view":"보기","pressure_halo":"압력 후광","state_option":"상태 기록","events_option":"이벤트 기록","language":"언어","maximize":"최대화","quit":"종료",
 "move_window":"이 머리글을 끌어 플럭스글라스를 이동합니다","resize":"끌어서 크기를 조절합니다","quit_tip":"플럭스글라스를 종료합니다","gpu_activity":"GPU 활동","recent_events":"최근 이벤트","no_gpu_process":"보고된 프로세스별 GPU 활동이 없습니다",
 "host_status":"{host}  ·  {power}온라인 코어 {cores}개","gpu_power":"GPU {watts:.0f} W  ·  ","process_row":"{name}  ·  PID {pid}","process_stats":"{memory}   SM {sm:.0f}%",
+"gpu_approx":"\u2248 {value:.0f}%","shared_memory":"  ·  시스템 RAM 공유","gpu_unavailable":"측정 불가","gpu_absent":"GPU 없음",
 "event_started":"모니터링 시작","event_state":"상태: {old} → {new}","event_gpu_available":"GPU 센서 연결됨","event_gpu_lost":"GPU 센서 연결 끊김","event_throttle":"GPU 클록 제한 활성","recording_path":"기록 저장 위치: {path}",
 "tooltip_metrics":"CPU {cpu:.0f}% | GPU {gpu:.0f}% | RAM {ram:.0f}% | VRAM {vram:.0f}% | 압력 {pressure:.2f}%",
 }

@@ -27,6 +27,15 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(resource_metrics(snap(20,20,90))["state"],"MEMORY PRESSURE")
         pressured=snap(20,20); pressured["pressure"]={"io":{"some":{"avg10":2.5}}}
         self.assertEqual(resource_metrics(pressured)["state"],"CONTENTION")
+    def test_shared_memory_reports_memory_not_vram_pressure(self):
+        """Integrated graphics mirror system RAM, so one full pool must not be reported twice."""
+        shared={"cpu":{"pct":20},"gpu":{"util_pct":None,"used_mb":95,"total_mb":100,"shared_memory":True},"memory":{"used_mb":95,"total_mb":100}}
+        metrics=resource_metrics(shared)
+        self.assertEqual(metrics["state"],"MEMORY PRESSURE")
+        self.assertTrue(metrics["shared_memory"])
+        self.assertFalse(metrics["gpu_available"])
+        dedicated=dict(shared,gpu=dict(shared["gpu"],shared_memory=False,util_pct=20))
+        self.assertEqual(resource_metrics(dedicated)["state"],"VRAM PRESSURE")
     def test_event_detection(self):
         base={"cpu":{"pct":1},"gpu":{"util_pct":1,"used_mb":1,"total_mb":100},"memory":{"used_mb":1,"total_mb":100}}
         busy={"cpu":{"pct":80},"gpu":{"util_pct":1,"used_mb":1,"total_mb":100},"memory":{"used_mb":1,"total_mb":100}}

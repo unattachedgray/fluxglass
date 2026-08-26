@@ -1,5 +1,5 @@
 """Read-only, dependency-free Linux sensor sampler."""
-import json, subprocess, time
+import ctypes, json, os, platform, struct, subprocess, time
 from pathlib import Path
 
 def parse_cpu_list(text):
@@ -37,7 +37,7 @@ def parse_psi(text):
     return result
 
 class Sampler:
-    def __init__(self): self.prev=None; self.cores={}
+    def __init__(self): self.prev=None; self.cores={}; self.engine_busy=EngineBusy()
     def read(self,p): return Path(p).read_text()
     def cpuset(self,n):
         try:return parse_cpu_list(self.read(f"/sys/devices/system/cpu/{n}"))
@@ -76,9 +76,16 @@ class Sampler:
                 except OSError:return fallback
             gpu["processes"]=parse_pmon(pmon,pname); return gpu
         except (OSError,subprocess.SubprocessError,IndexError):return self.drm_gpu()
-    def drm_gpu(self):
-        """Best-effort AMD/Intel telemetry from stable DRM/sysfs counters."""
-        for card in sorted(Path("/sys/class/drm").glob("card[0-9]*")):
+    def busy(self,card):
+        """Exact engine busy when the PMU is permitted, else the coarse frequency proxy."""
+        util=self.engine_busy.read()
+        if util is not None:return util,"pmu"
+        util=frequency_busy(card)
+        return (util,"frequency") if util is not None else (None,None)
+    def drm_gpu(self,root=Path("/sys/class/drm"),meminfo=Path("/proc/meminfo")):
+        """Dedicated counters when a card exposes them, else a shared-memory reading for integrated graphics."""
+        shared=None
+        for card in sorted(root.glob("card[0-9]*")):
             dev=card/"device"
             try:
                 vendor=(dev/"vendor").read_text().strip()
@@ -94,12 +101,17 @@ class Sampler:
             for hwmon in (dev/"hwmon").glob("hwmon*"):
                 temp=number_from(hwmon/"temp1_input",1000)
                 if temp is not None:break
+            common={"bandwidth_pct":None,"temperature_c":temp,"power_w":None,"power_limit_w":None,
+                    "fan_pct":None,"clock_mhz":None,"processes":[],
+                    "vendor":{"0x1002":"AMD","0x8086":"Intel","0x10de":"NVIDIA"}.get(vendor,vendor)}
             if util is not None or total is not None:
-                return {"used_mb":used or 0,"total_mb":total or 0,"util_pct":util or 0,
-                        "bandwidth_pct":None,"temperature_c":temp,"power_w":None,
-                        "power_limit_w":None,"fan_pct":None,"clock_mhz":None,
-                        "vendor":{"0x1002":"AMD","0x8086":"Intel"}.get(vendor,vendor),"processes":[]}
-        return None
+                return {**common,"used_mb":used or 0,"total_mb":total or 0,"util_pct":util or 0,"util_source":"counter","shared_memory":False}
+            if shared is None and is_integrated(dev):
+                used_mb,total_mb=system_memory_mb(meminfo)
+                util,source=self.busy(card)
+                shared={**common,"used_mb":used_mb,"total_mb":total_mb,"util_pct":util,
+                        "util_source":source,"shared_memory":True}
+        return shared
     def sample(self):
         lines=self.read("/proc/stat").splitlines(); v=[int(x) for x in lines[0].split()[1:]]; total,idle=sum(v),v[3]+v[4]; pct=0
         if self.prev:
@@ -118,6 +130,80 @@ class Sampler:
 def number_from(path, divisor=1):
     try:return float(path.read_text().strip())/divisor
     except (OSError,ValueError):return None
+
+def is_integrated(dev):
+    """Integrated graphics sit on the PCI root bus; discrete cards sit behind a bridge."""
+    try:slot=dev.resolve().name
+    except OSError:return False
+    parts=slot.split(":")
+    return len(parts)==3 and parts[1]=="00"
+
+def system_memory_mb(path=Path("/proc/meminfo")):
+    """Used and total system memory in MiB, the pool integrated graphics draws from."""
+    mem={}
+    for line in Path(path).read_text().splitlines():
+        key,value=line.split(":",1); mem[key]=int(value.split()[0])/1024
+    return mem["MemTotal"]-mem["MemAvailable"],mem["MemTotal"]
+
+PERF_EVENT_OPEN={"x86_64":298,"aarch64":241}
+
+class EngineBusy:
+    """How hard the GPU is working, from the i915 PMU when the kernel permits it.
+
+    The PMU reports engine-busy nanoseconds, so it is exact and it separates partial
+    load from full load. It needs CAP_PERFMON or perf_event_paranoid<=0; without
+    either, perf_event_open is refused and the caller falls back to frequency_busy.
+    Opening a counter is a read-only operation: nothing here writes to the GPU.
+    """
+    BASE=Path("/sys/bus/event_source/devices/i915")
+    ENGINES=("rcs0-busy","bcs0-busy","vcs0-busy","vecs0-busy")
+    def __init__(self,base=None):
+        self.base=Path(base) if base else self.BASE; self.fds={}; self.prev=None
+        try:self._open()
+        except (OSError,ValueError,AttributeError):self.close()
+    def _open(self):
+        syscall=PERF_EVENT_OPEN.get(platform.machine())
+        if syscall is None or not self.base.exists():return
+        ptype=int((self.base/"type").read_text())
+        libc=ctypes.CDLL("libc.so.6",use_errno=True)
+        for name in self.ENGINES:
+            source=self.base/"events"/name
+            if not source.exists():continue
+            config=int(source.read_text().strip().split("=")[1],0)
+            attr=bytearray(128); struct.pack_into("=IIQ",attr,0,ptype,128,config)
+            fd=libc.syscall(syscall,ctypes.c_char_p(bytes(attr)),ctypes.c_int(-1),ctypes.c_int(0),ctypes.c_int(-1),ctypes.c_ulong(0))
+            if fd<0:raise OSError(ctypes.get_errno(),"perf_event_open refused")
+            self.fds[name]=fd
+    def close(self):
+        for fd in self.fds.values():
+            try:os.close(fd)
+            except OSError:pass
+        self.fds={}
+    def read(self):
+        """Busiest engine as a percentage, or None when the PMU is unavailable.
+
+        The first call only primes the counters; a rate needs two readings.
+        """
+        if not self.fds:return None
+        now=time.monotonic()
+        try:counts={name:struct.unpack("=Q",os.read(fd,8))[0] for name,fd in self.fds.items()}
+        except (OSError,struct.error):self.close(); return None
+        previous=self.prev; self.prev=(now,counts)
+        if previous is None:return None
+        elapsed=(now-previous[0])*1e9
+        if elapsed<=0:return None
+        busiest=max((counts[n]-previous[1].get(n,counts[n]))/elapsed for n in counts)
+        return max(0.0,min(100.0,100.0*busiest))
+
+def frequency_busy(card):
+    """Coarse GPU load from the actual P-state: 0% at RPn, 100% at RP0.
+
+    Needs no permission at all, but it saturates - once the GPU pegs at RP0 a half
+    load and a full load read alike - so callers must present it as approximate.
+    """
+    act=number_from(card/"gt_act_freq_mhz"); low=number_from(card/"gt_RPn_freq_mhz"); high=number_from(card/"gt_RP0_freq_mhz")
+    if act is None or low is None or high is None or high<=low:return None
+    return max(0.0,min(100.0,100.0*(act-low)/(high-low)))
 
 def snapshot_json():
     """Stable machine-readable boundary shared by the app and other clients."""
