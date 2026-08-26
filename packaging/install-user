@@ -16,7 +16,7 @@ sed "s|Exec=fluxglass|Exec=$bin_dir/fluxglass|g" \
 chmod 0644 "$data_dir/applications/io.github.unattachedgray.Fluxglass.desktop"
 cat > "$bin_dir/fluxglass" <<EOF
 #!/usr/bin/env bash
-exec env PYTHONPATH="$lib_dir" python3 -m fluxglass "\$@"
+exec env PYTHONPATH="$lib_dir" /usr/bin/python3 -m fluxglass "\$@"
 EOF
 chmod 0755 "$bin_dir/fluxglass"
 command -v update-desktop-database >/dev/null && update-desktop-database "$data_dir/applications"

@@ -81,7 +81,7 @@ memory. It is a read-only monitor.
 Run from a checkout:
 
 ```bash
-PYTHONPATH=src python3 -m fluxglass
+PYTHONPATH=src /usr/bin/python3 -m fluxglass
 ```
 
 The frameless window works on GNOME, KDE, COSMIC, XFCE, Cinnamon, and other

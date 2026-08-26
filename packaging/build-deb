@@ -19,7 +19,7 @@ install -m 0644 "$repo_dir"/assets/fonts/*-OFL.txt "$root/usr/share/doc/fluxglas
 sed "s/@VERSION@/$version/" "$repo_dir/packaging/control" > "$root/DEBIAN/control"
 cat > "$root/usr/bin/fluxglass" <<'EOF'
 #!/usr/bin/env bash
-exec env PYTHONPATH=/usr/lib/fluxglass python3 -m fluxglass "$@"
+exec env PYTHONPATH=/usr/lib/fluxglass /usr/bin/python3 -m fluxglass "$@"
 EOF
 chmod 0755 "$root/usr/bin/fluxglass"
 mkdir -p "$repo_dir/dist"
